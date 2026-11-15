@@ -77,6 +77,7 @@
     .visually-hidden { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
     @media (max-width:700px) { .form-grid { grid-template-columns:1fr 1fr; } .form-grid .wide { grid-column:1/-1; } .form-grid button { width:100%; } }
     @media (max-width:520px) { .wrap { width:min(100% - 24px,1000px); padding-top:28px; } .panel { padding:16px; } .grid { grid-template-columns:1fr; } .toolbar { align-items:flex-start; } .actions { width:100%; } .actions button { flex:1; } }
+    #category-chips,.pills{display:flex;gap:5px;flex-wrap:wrap}.category{color:#aeb7c6;background:#222733;border-radius:999px;padding:2px 8px;font-size:.72rem}#manage{padding:10px;display:flex;gap:8px;flex-wrap:wrap}#manage[hidden],#bulk[hidden]{display:none}.bookmark>input[type=checkbox]{width:20px;min-height:20px}
   </style>
 </head>
 <body>
@@ -93,14 +94,14 @@
           <div><label for="name">Name</label><input id="name" maxlength="100" autocomplete="off" placeholder="e.g. Study guide"></div>
           <div class="wide"><label for="url">URL</label><input id="url" type="text" inputmode="url" maxlength="2000" autocomplete="url" placeholder="example.com"></div>
           <div><label for="icon">Icon</label><select id="icon" class="icon-select"><option value="">Default link</option><option>🔗</option><option>📚</option><option>🎮</option><option>🎵</option><option>🎬</option><option>🛠️</option><option>📝</option><option>⭐</option><option>🌐</option><option>📷</option><option>💬</option><option>🧩</option></select></div>
-          <div><label for="category">Category</label><input id="category" list="category-list" maxlength="40" autocomplete="off" value="General" placeholder="Choose or type"><datalist id="category-list"></datalist></div>
+          <div class="wide"><label>Categories</label><div id="category-chips"></div><div style="display:flex;gap:6px"><input id="new-category" maxlength="40" placeholder="New category"><button type="button" id="add-category">Add</button></div></div>
           <button id="save-button" class="primary" type="submit">Add bookmark</button>
         </div>
         <p id="message" class="message" role="status" aria-live="polite"></p>
       </form>
     </section>
     <div class="toolbar">
-      <nav id="tabs" class="tabs" aria-label="Filter bookmarks"></nav>
+      <nav id="tabs" class="tabs" aria-label="Filter bookmarks"></nav><button id="manage-toggle" type="button">Manage categories</button><div id="manage" hidden></div><div id="select-tools"><button id="select-toggle" type="button">Select</button><span id="bulk" hidden><button id="select-all">Select all</button><button id="clear-selection">Clear</button><select id="bulk-category"></select><button id="bulk-add">Add category</button><button id="bulk-remove">Remove category</button><button id="bulk-favorite">Favorite</button><button id="bulk-unfavorite">Unfavorite</button><button id="bulk-delete" class="delete">Delete selected</button><span id="delete-confirm" hidden></span></span></div>
       <div class="view-toggle" aria-label="Bookmark view"><button id="grid-view" type="button" aria-label="Grid view" title="Grid view">▦</button><button id="list-view" type="button" aria-label="List view" title="List view">☰</button></div>
       <div class="actions">
         <button id="export-button" type="button">Export</button>
@@ -113,82 +114,17 @@
 <script>
 (() => {
   'use strict';
-  const KEY = 'bookmark-organizer-bookmarks-v1';
-  const DEFAULT_CATEGORIES = ['Learning', 'General', 'Entertainment', 'Tools'];
-  const starters = [
-    { id:'starter-google', name:'Google', url:'https://www.google.com', category:'General', favorite:false },
-    { id:'starter-youtube', name:'YouTube', url:'https://www.youtube.com', category:'Entertainment', favorite:false },
-    { id:'starter-github', name:'GitHub', url:'https://github.com', category:'Tools', favorite:false }
-  ];
-  const $ = id => document.getElementById(id);
-  let bookmarks = load();
-  let activeCategory = 'All';
-  let editingId = null;
-  let viewMode = localStorage.getItem('bookmark-view') === 'list' ? 'list' : 'grid';
-  function load() {
-    try {
-      const saved = localStorage.getItem(KEY);
-      if (saved === null) { localStorage.setItem(KEY, JSON.stringify(starters)); return starters.map(x => ({...x})); }
-      const parsed = JSON.parse(saved);
-      if (!Array.isArray(parsed)) return [];
-      const seen = new Set();
-      return parsed.filter(validBookmark).map(raw => { const item=cleanBookmark(raw); if(seen.has(item.id)) item.id=makeId(); seen.add(item.id); return item; });
-    } catch (_) { return []; }
-  }
-  function validBookmark(b) { return b && typeof b.name === 'string' && typeof b.url === 'string' && typeof b.category === 'string'; }
-  function cleanBookmark(b) { return { id: typeof b.id === 'string' ? b.id : makeId(), name:b.name.slice(0,100), url:b.url.slice(0,2000), category:(b.category.trim() || 'General').slice(0,40), favorite:!!b.favorite, icon:typeof b.icon==='string'?b.icon:'' }; }
-  function save() { try { localStorage.setItem(KEY, JSON.stringify(bookmarks)); } catch (_) { showMessage('Could not save. Browser storage may be unavailable.'); } }
-  function makeId() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
-  function safeUrl(raw) {
-    const value = raw.trim();
-    const withScheme = /^https?:\/\//i.test(value) ? value : 'https://' + value;
-    try { const u = new URL(withScheme); return (u.protocol === 'http:' || u.protocol === 'https:') ? u.href : null; } catch (_) { return null; }
-  }
-  function showMessage(text) { $('message').textContent = text; }
-  function categories() { return [...new Set([...DEFAULT_CATEGORIES, ...bookmarks.map(b => b.category)].filter(Boolean))]; }
-  function render() {
-    const cats = categories();
-    $('category-list').replaceChildren(...cats.map(c => { const o=document.createElement('option'); o.value=c; return o; }));
-    const tabs = ['All', ...cats];
-    $('tabs').replaceChildren(...tabs.map(c => { const b=document.createElement('button'); b.type='button'; b.className='tab' + (activeCategory===c?' active':''); b.textContent=c; b.setAttribute('aria-pressed', String(activeCategory===c)); b.addEventListener('click',()=>{activeCategory=c;render();}); return b; }));
-    const list = bookmarks.filter(b => activeCategory==='All' || b.category===activeCategory).slice().sort((a,b) => Number(b.favorite)-Number(a.favorite) || a.name.localeCompare(b.name));
-    const area=$('bookmarks'); area.replaceChildren(); area.className=viewMode==='list'?'list-view':'grid';
-    $('grid-view').classList.toggle('active',viewMode==='grid'); $('list-view').classList.toggle('active',viewMode==='list');
-    if (!list.length) { const p=document.createElement('p'); p.className='empty'; p.textContent='No bookmarks here yet. Add one above.'; area.append(p); return; }
-    list.forEach(item => {
-      const card=document.createElement('article'); card.className='bookmark' + (item.favorite?' favorite':'');
-      const top=document.createElement('div'); top.className='card-top';
-      const icon=document.createElement('span'); icon.className='bookmark-icon'; icon.textContent=item.icon||'↗'; icon.setAttribute('aria-hidden','true');
-      const a=document.createElement('a'); a.className='title-link'; a.href=item.url; a.target='_blank'; a.rel='noopener noreferrer'; a.textContent=item.name;
-      const star=document.createElement('button'); star.type='button'; star.className='star'+(item.favorite?' on':''); star.textContent=item.favorite?'★':'☆'; star.setAttribute('aria-label',item.favorite?'Remove favorite':'Add favorite'); star.title=star.getAttribute('aria-label');
-      star.addEventListener('click',()=>{ const target=bookmarks.find(b=>b.id===item.id); if(!target)return; target.favorite=!target.favorite; save(); render(); });
-      const titleWrap=document.createElement('div'); titleWrap.className='card-title-wrap'; titleWrap.append(icon,a); top.append(titleWrap,star);
-      const url=document.createElement('a'); url.className='url'; url.href=item.url; url.target='_blank'; url.rel='noopener noreferrer'; url.textContent=item.url;
-      const bottom=document.createElement('div'); bottom.className='card-bottom'; const cat=document.createElement('span'); cat.className='category'; cat.textContent=item.category;
-      const buttons=document.createElement('div'); buttons.className='card-buttons';
-      const edit=document.createElement('button'); edit.type='button'; edit.textContent='Edit'; edit.addEventListener('click',()=>{ const target=bookmarks.find(b=>b.id===item.id); if(target) beginEdit(target); });
-      const del=document.createElement('button'); del.type='button'; del.className='delete'; del.textContent='Delete'; del.addEventListener('click',()=>{if(confirm('Delete “'+item.name+'”?')){bookmarks=bookmarks.filter(b=>b.id!==item.id);save();render();}});
-      buttons.append(edit,del); bottom.append(cat,buttons); if(viewMode==='list'){ const main=document.createElement('div'); main.className='list-main'; const copy=document.createElement('div'); copy.className='list-copy'; copy.append(a,url); main.append(icon,copy); card.append(main,star,bottom); } else card.append(top,url,bottom); area.append(card);
-    });
-  }
-  function beginEdit(item) {
-    editingId=item.id; $('name').value=item.name; $('url').value=item.url; $('category').value=item.category; $('icon').value=item.icon||'';
-    $('form-title').textContent='Edit bookmark'; $('save-button').textContent='Save changes'; showMessage(''); $('name').focus();
-  }
-  function resetForm() { editingId=null; $('bookmark-form').reset(); $('category').value='General'; $('icon').value=''; $('form-title').textContent='Add a bookmark'; $('save-button').textContent='Add bookmark'; }
-  $('bookmark-form').addEventListener('submit', event => {
-    event.preventDefault(); const name=$('name').value.trim(), rawUrl=$('url').value.trim(), category=$('category').value.trim() || 'General';
-    if (!name || !rawUrl) { showMessage('Enter both a name and a URL.'); return; }
-    const url=safeUrl(rawUrl); if (!url) { showMessage('Enter a valid web address.'); return; }
-    if (editingId) { const item=bookmarks.find(b=>b.id===editingId); if(item) Object.assign(item,{name,url,category,icon:$('icon').value}); }
-    else bookmarks.push({id:makeId(),name,url,category,favorite:false,icon:$('icon').value});
-    save(); showMessage('Saved.'); resetForm(); render();
-  });
-  $('grid-view').addEventListener('click',()=>{viewMode='grid';localStorage.setItem('bookmark-view',viewMode);render();});
-  $('list-view').addEventListener('click',()=>{viewMode='list';localStorage.setItem('bookmark-view',viewMode);render();});
-  $('export-button').addEventListener('click',()=>{
-    const blob=new Blob([JSON.stringify(bookmarks,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='bookmarks.json'; document.body.append(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),1000);
-  });
+  const KEY='bookmark-organizer-bookmarks-v1', CATKEY='bookmark-organizer-categories-v1', DEFAULT_CATEGORIES=['Learning','General','Entertainment','Tools']; const $=id=>document.getElementById(id); let custom=JSON.parse(localStorage.getItem(CATKEY)||'[]'), selectedCats=['General'], selected=new Set(),selectMode=false,activeCategory='All',editingId=null,viewMode=localStorage.getItem('bookmark-view')==='list'?'list':'grid';
+  const starters=[{id:'starter-google',name:'Google',url:'https://www.google.com',category:'General'},{id:'starter-youtube',name:'YouTube',url:'https://www.youtube.com',category:'Entertainment'},{id:'starter-github',name:'GitHub',url:'https://github.com',category:'Tools'}]; const makeId=()=>Date.now().toString(36)+Math.random().toString(36).slice(2);
+  function validBookmark(b){return b&&typeof b.name==='string'&&typeof b.url==='string'&&(typeof b.category==='string'||Array.isArray(b.categories)||Array.isArray(b.category))} function cleanBookmark(b){return {id:typeof b.id==='string'?b.id:makeId(),name:b.name.slice(0,100),url:b.url.slice(0,2000),categories:[...new Set((Array.isArray(b.categories)?b.categories:Array.isArray(b.category)?b.category:[b.category]).filter(x=>typeof x==='string'&&x.trim()).map(x=>x.trim().slice(0,40)))].length?[...new Set((Array.isArray(b.categories)?b.categories:Array.isArray(b.category)?b.category:[b.category]).filter(x=>typeof x==='string'&&x.trim()).map(x=>x.trim().slice(0,40)))]:['General'],favorite:!!b.favorite,icon:b.icon||''}} let bookmarks; try{const v=JSON.parse(localStorage.getItem(KEY));bookmarks=Array.isArray(v)?v.filter(validBookmark).map(cleanBookmark):starters.map(cleanBookmark)}catch{bookmarks=starters.map(cleanBookmark)} function save(){localStorage.setItem(KEY,JSON.stringify(bookmarks));localStorage.setItem(CATKEY,JSON.stringify(custom))} function cats(){return [...new Set([...DEFAULT_CATEGORIES,...custom,...bookmarks.flatMap(b=>b.categories)])]} function safeUrl(v){try{const u=new URL(/^https?:\/\//i.test(v)?v:'https://'+v);return ['http:','https:'].includes(u.protocol)?u.href:null}catch{return null}} function showMessage(t){$('message').textContent=t}
+  function render(){const cs=cats(); if(!cs.includes(activeCategory)&&activeCategory!=='All')activeCategory='All'; $('tabs').replaceChildren(...['All',...cs].map(c=>{const x=document.createElement('button');x.className='tab '+(activeCategory===c?'active':'');x.textContent=c;x.onclick=()=>{activeCategory=c;render()};return x})); $('category-chips').replaceChildren(...cs.map(c=>{const x=document.createElement('button');x.type='button';x.textContent=c;x.className='tab '+(selectedCats.includes(c)?'active':'');x.onclick=()=>{selectedCats=selectedCats.includes(c)?selectedCats.filter(v=>v!==c):[...selectedCats,c];drawChips()};return x})); $('bulk-category').replaceChildren(...cs.map(c=>new Option(c,c))); const area=$('bookmarks');area.replaceChildren();area.className=viewMode==='list'?'list-view':'grid'; $('bulk').hidden=!selectMode;$('select-toggle').textContent=selectMode?'Done':'Select';$('grid-view').classList.toggle('active',viewMode==='grid');$('list-view').classList.toggle('active',viewMode==='list');const rows=bookmarks.filter(b=>activeCategory==='All'||b.categories.includes(activeCategory)).slice().sort((a,b)=>Number(b.favorite)-Number(a.favorite)||a.name.localeCompare(b.name)); if(!rows.length){area.innerHTML='<p class="empty">No bookmarks here yet. Add one above.</p>';return} rows.forEach(item=>{const card=document.createElement('article');card.className='bookmark'+(item.favorite?' favorite':'');const check=document.createElement('input');check.type='checkbox';check.hidden=!selectMode;check.checked=selected.has(item.id);check.onchange=()=>{check.checked?selected.add(item.id):selected.delete(item.id)};const a=document.createElement('a');a.className='title-link';a.href=item.url;a.target='_blank';a.rel='noopener noreferrer';a.textContent=item.name;const star=document.createElement('button');star.className='star'+(item.favorite?' on':'');star.textContent=item.favorite?'★':'☆';star.onclick=()=>{const t=bookmarks.find(x=>x.id===item.id);t.favorite=!t.favorite;save();render()};const icon=document.createElement('span');icon.className='bookmark-icon';icon.textContent=item.icon||'↗';const url=document.createElement('a');url.className='url';url.href=item.url;url.target='_blank';url.textContent=item.url;const pills=document.createElement('div');pills.className='pills';item.categories.forEach(c=>{const z=document.createElement('span');z.className='category';z.textContent=c;pills.append(z)});const buttons=document.createElement('div');buttons.className='card-buttons';const edit=document.createElement('button');edit.textContent='Edit';edit.onclick=()=>beginEdit(item);const del=document.createElement('button');del.textContent='Delete';del.onclick=()=>{bookmarks=bookmarks.filter(x=>x.id!==item.id);save();render()};buttons.append(edit,del);card.append(check,icon,a,star,url,pills,buttons);area.append(card)}); renderManage()}
+  function drawChips(){render()} function beginEdit(x){editingId=x.id;$('name').value=x.name;$('url').value=x.url;$('icon').value=x.icon||'';selectedCats=[...x.categories];render();$('form-title').textContent='Edit bookmark';$('save-button').textContent='Save changes'} function resetForm(){editingId=null;$('bookmark-form').reset();selectedCats=['General'];$('form-title').textContent='Add a bookmark';$('save-button').textContent='Add bookmark'}
+  $('add-category').onclick=()=>{const c=$('new-category').value.trim().slice(0,40);if(c&&!cats().includes(c)){custom.push(c);selectedCats.push(c);save();$('new-category').value='';render()}};
+  $('bookmark-form').onsubmit=e=>{e.preventDefault();const name=$('name').value.trim(),url=safeUrl($('url').value.trim());if(!name||!url){showMessage('Enter a name and valid URL.');return}const categories=selectedCats.length?[...selectedCats]:['General'];const item={name,url,categories,icon:$('icon').value};if(editingId){Object.assign(bookmarks.find(x=>x.id===editingId),item)}else bookmarks.push({id:makeId(),...item,favorite:false});save();resetForm();render()};
+  $('grid-view').onclick=()=>{viewMode='grid';localStorage.setItem('bookmark-view',viewMode);render()};$('list-view').onclick=()=>{viewMode='list';localStorage.setItem('bookmark-view',viewMode);render()};$('select-toggle').onclick=()=>{selectMode=!selectMode;selected.clear();render()};$('select-all').onclick=()=>{bookmarks.filter(b=>activeCategory==='All'||b.categories.includes(activeCategory)).forEach(b=>selected.add(b.id));render()};$('clear-selection').onclick=()=>{selected.clear();render()};
+  function applyCats(mode){const c=$('bulk-category').value;bookmarks.forEach(b=>{if(selected.has(b.id)){b.categories=mode==='add'?[...new Set([...b.categories,c])]:b.categories.filter(x=>x!==c);if(!b.categories.length)b.categories=['General']}});save();render()} $('bulk-add').onclick=()=>applyCats('add');$('bulk-remove').onclick=()=>applyCats('remove');$('bulk-favorite').onclick=()=>{bookmarks.forEach(b=>{if(selected.has(b.id))b.favorite=true});save();render()};$('bulk-unfavorite').onclick=()=>{bookmarks.forEach(b=>{if(selected.has(b.id))b.favorite=false});save();render()};$('bulk-delete').onclick=()=>{const n=selected.size;if(!n)return;if(n>1){const q=$('delete-confirm');q.hidden=false;q.innerHTML='Delete '+n+' bookmarks? ';const cancel=document.createElement('button');cancel.textContent='Cancel';cancel.onclick=()=>q.hidden=true;const yes=document.createElement('button');yes.textContent='Delete';yes.onclick=doDelete;q.append(cancel,yes)}else doDelete()};function doDelete(){bookmarks=bookmarks.filter(b=>!selected.has(b.id));selected.clear();save();render()}
+  function renderManage(){const box=$('manage');box.replaceChildren(...cats().map(c=>{const row=document.createElement('span');row.textContent=c+' ';const inp=document.createElement('input');inp.value=c;inp.maxLength=40;const ren=document.createElement('button');ren.textContent='Rename';ren.onclick=()=>{const n=inp.value.trim();if(!n)return;bookmarks.forEach(b=>{if(b.categories.includes(c))b.categories=b.categories.map(v=>v===c?n:v)});custom=custom.map(v=>v===c?n:v);save();render()};const del=document.createElement('button');del.textContent='Delete';del.onclick=()=>{bookmarks.forEach(b=>{b.categories=b.categories.filter(v=>v!==c);if(!b.categories.length)b.categories=['General']});custom=custom.filter(v=>v!==c);save();render()};row.append(inp,ren,del);return row}))} $('manage-toggle').onclick=()=>{$('manage').hidden=!$('manage').hidden;renderManage()};
+  $('export-button').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(bookmarks,null,2)],{type:'application/json'}));a.download='bookmarks.json';a.click()};
   $('import-button').addEventListener('click',()=>$('import-file').click());
   function extractBookmarks(text) {
     const usable = value => Array.isArray(value) && value.some(validBookmark) ? value : null;
@@ -229,11 +165,11 @@
         incoming.forEach(raw=>{
           if(!raw || typeof raw.url!=='string') return;
           const href=raw.url.trim(); if(!href || /^javascript:/i.test(href)) return;
-          const item={id:makeId(),name:(typeof raw.name==='string' && raw.name.trim()?raw.name.trim():href).slice(0,100),url:href.slice(0,2000),category:general,favorite:false};
+          const item={id:makeId(),name:(typeof raw.name==='string' && raw.name.trim()?raw.name.trim():href).slice(0,100),url:href.slice(0,2000),categories:[general],favorite:false};
           if(!bookmarks.some(b=>b.url===item.url)){bookmarks.push(item);added++;}
         });
       } else {
-        incoming.filter(validBookmark).forEach(raw=>{ const item=cleanBookmark(raw); const duplicate=bookmarks.some(b=>b.url===item.url && b.name.toLowerCase()===item.name.toLowerCase() && b.category.toLowerCase()===item.category.toLowerCase()); if(!duplicate){ if(bookmarks.some(b=>b.id===item.id)) item.id=makeId(); bookmarks.push(item); added++; } });
+        incoming.filter(validBookmark).forEach(raw=>{ const item=cleanBookmark(raw); const duplicate=bookmarks.some(b=>b.url===item.url && b.name.toLowerCase()===item.name.toLowerCase() && b.categories.join(',').toLowerCase()===item.categories.join(',').toLowerCase()); if(!duplicate){ if(bookmarks.some(b=>b.id===item.id)) item.id=makeId(); bookmarks.push(item); added++; } });
       }
       if(added){save();render();}
       showMessage(added ? `Imported ${added} bookmark${added===1?'':'s'}.` : 'No bookmarks found in that file.');
