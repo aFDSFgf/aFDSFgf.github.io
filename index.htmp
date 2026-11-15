@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Gage's Organizer</title>
+  <style>
+    :root { color-scheme: dark; --bg:#0f1115; --card:#171a21; --line:#292e39; --text:#e7eaf0; --muted:#9ba4b3; --accent:#39bdf8; --danger:#ff6b75; }
+    * { box-sizing:border-box; }
+    body { margin:0; min-height:100vh; background:var(--bg); color:var(--text); font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif; }
+    .wrap { width:min(100% - 32px, 1000px); margin:0 auto; padding:42px 0 56px; }
+    header { margin-bottom:28px; }
+    h1 { margin:0; font-size:clamp(2rem,6vw,2.8rem); line-height:1.15; letter-spacing:-.04em; }
+    .subtitle { margin:8px 0 0; color:var(--muted); }
+    .panel { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:20px; margin-bottom:22px; }
+    h2 { font-size:1.1rem; margin:0 0 14px; }
+    .form-grid { display:grid; grid-template-columns:1fr 1.4fr 1fr auto; gap:12px; align-items:end; }
+    label { display:block; color:var(--muted); font-size:.85rem; margin-bottom:5px; }
+    input { width:100%; min-width:0; min-height:44px; border:1px solid var(--line); background:#101319; color:var(--text); border-radius:9px; padding:10px 12px; font:inherit; }
+    input:focus, button:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+    button { border:1px solid var(--line); color:var(--text); background:#222733; border-radius:9px; min-height:42px; padding:8px 13px; font:inherit; font-weight:600; cursor:pointer; }
+    button:hover { border-color:var(--accent); }
+    .primary { background:var(--accent); border-color:var(--accent); color:#07141b; }
+    .toolbar { display:flex; flex-wrap:wrap; gap:10px; justify-content:space-between; align-items:center; margin:0 0 16px; }
+    .tabs { display:flex; gap:8px; overflow-x:auto; padding:3px 2px 8px; scrollbar-width:thin; }
+    .tab { white-space:nowrap; border-radius:999px; min-height:40px; padding:7px 14px; background:transparent; }
+    .tab.active { background:#123044; border-color:#1b91c5; color:#8ddfff; }
+    .actions { display:flex; gap:8px; }
+    .actions button { min-height:40px; }
+    .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
+    .bookmark { min-width:0; background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px; }
+    .bookmark.favorite { border-color:#287fa3; }
+    .card-top { display:flex; gap:10px; align-items:flex-start; }
+    .title-link { color:var(--text); font-size:1.05rem; font-weight:700; text-decoration:none; overflow-wrap:anywhere; flex:1; }
+    .title-link:hover { color:var(--accent); }
+    .star { min-width:42px; padding:5px; color:#8b95a5; font-size:1.2rem; line-height:1; }
+    .star.on { color:#ffd166; border-color:#705d2d; }
+    .url { display:block; color:var(--muted); font-size:.83rem; margin:7px 0 12px; overflow-wrap:anywhere; text-decoration:none; }
+    .url:hover { color:var(--accent); }
+    .card-bottom { display:flex; justify-content:space-between; align-items:center; gap:10px; }
+    .category { color:#aeb7c6; background:#222733; border-radius:999px; padding:3px 9px; font-size:.76rem; }
+    .card-buttons { display:flex; gap:7px; }
+    .card-buttons button { min-height:38px; padding:6px 11px; }
+    .delete { color:#ff9ba1; }
+    .message { margin:10px 0 0; color:#ffc66d; min-height:1.4em; font-size:.9rem; }
+    .empty { color:var(--muted); background:var(--card); border:1px dashed var(--line); padding:25px; border-radius:14px; text-align:center; grid-column:1/-1; }
+    .visually-hidden { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+    @media (max-width:700px) { .form-grid { grid-template-columns:1fr 1fr; } .form-grid .wide { grid-column:1/-1; } .form-grid button { width:100%; } }
+    @media (max-width:520px) { .wrap { width:min(100% - 24px,1000px); padding-top:28px; } .panel { padding:16px; } .grid { grid-template-columns:1fr; } .toolbar { align-items:flex-start; } .actions { width:100%; } .actions button { flex:1; } }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <header>
+      <h1>Gage's Organizer</h1>
+      <p class="subtitle">Your links, saved on this device</p>
+    </header>
+    <section class="panel" aria-labelledby="form-title">
+      <h2 id="form-title">Add a bookmark</h2>
+      <form id="bookmark-form" novalidate>
+        <div class="form-grid">
+          <div><label for="name">Name</label><input id="name" maxlength="100" autocomplete="off" placeholder="e.g. Study guide"></div>
+          <div class="wide"><label for="url">URL</label><input id="url" type="text" inputmode="url" maxlength="2000" autocomplete="url" placeholder="example.com"></div>
+          <div><label for="category">Category</label><input id="category" list="category-list" maxlength="40" autocomplete="off" value="General" placeholder="Choose or type"><datalist id="category-list"></datalist></div>
+          <button id="save-button" class="primary" type="submit">Add bookmark</button>
+        </div>
+        <p id="message" class="message" role="status" aria-live="polite"></p>
+      </form>
+    </section>
+    <div class="toolbar">
+      <nav id="tabs" class="tabs" aria-label="Filter bookmarks"></nav>
+      <div class="actions">
+        <button id="export-button" type="button">Export</button>
+        <button id="import-button" type="button">Import</button>
+        <input id="import-file" class="visually-hidden" type="file" accept="application/json,.json">
+      </div>
+    </div>
+    <section id="bookmarks" class="grid" aria-label="Bookmarks"></section>
+  </main>
+<script>
+(() => {
+  'use strict';
+  const KEY = 'gage-organizer-bookmarks-v1';
+  const DEFAULT_CATEGORIES = ['School', 'General', 'Entertainment', 'Tools'];
+  const starters = [
+    { id:'starter-google', name:'Google', url:'https://www.google.com', category:'General', favorite:false },
+    { id:'starter-youtube', name:'YouTube', url:'https://www.youtube.com', category:'Entertainment', favorite:false },
+    { id:'starter-github', name:'GitHub', url:'https://github.com', category:'Tools', favorite:false }
+  ];
+  const $ = id => document.getElementById(id);
+  let bookmarks = load();
+  let activeCategory = 'All';
+  let editingId = null;
+  function load() {
+    try {
+      const saved = localStorage.getItem(KEY);
+      if (saved === null) { localStorage.setItem(KEY, JSON.stringify(starters)); return starters.map(x => ({...x})); }
+      const parsed = JSON.parse(saved);
+      return Array.isArray(parsed) ? parsed.filter(validBookmark).map(cleanBookmark) : [];
+    } catch (_) { return []; }
+  }
+  function validBookmark(b) { return b && typeof b.name === 'string' && typeof b.url === 'string' && typeof b.category === 'string'; }
+  function cleanBookmark(b) { return { id: typeof b.id === 'string' ? b.id : makeId(), name:b.name.slice(0,100), url:b.url.slice(0,2000), category:(b.category.trim() || 'General').slice(0,40), favorite:!!b.favorite }; }
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(bookmarks)); } catch (_) { showMessage('Could not save. Browser storage may be unavailable.'); } }
+  function makeId() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
+  function safeUrl(raw) {
+    const value = raw.trim();
+    const withScheme = /^https?:\/\//i.test(value) ? value : 'https://' + value;
+    try { const u = new URL(withScheme); return (u.protocol === 'http:' || u.protocol === 'https:') ? u.href : null; } catch (_) { return null; }
+  }
+  function showMessage(text) { $('message').textContent = text; }
+  function categories() { return [...new Set([...DEFAULT_CATEGORIES, ...bookmarks.map(b => b.category)].filter(Boolean))]; }
+  function render() {
+    const cats = categories();
+    $('category-list').replaceChildren(...cats.map(c => { const o=document.createElement('option'); o.value=c; return o; }));
+    const tabs = ['All', ...cats];
+    $('tabs').replaceChildren(...tabs.map(c => { const b=document.createElement('button'); b.type='button'; b.className='tab' + (activeCategory===c?' active':''); b.textContent=c; b.setAttribute('aria-pressed', String(activeCategory===c)); b.addEventListener('click',()=>{activeCategory=c;render();}); return b; }));
+    const list = bookmarks.filter(b => activeCategory==='All' || b.category===activeCategory).slice().sort((a,b) => Number(b.favorite)-Number(a.favorite) || a.name.localeCompare(b.name));
+    const area=$('bookmarks'); area.replaceChildren();
+    if (!list.length) { const p=document.createElement('p'); p.className='empty'; p.textContent='No bookmarks here yet. Add one above.'; area.append(p); return; }
+    list.forEach(item => {
+      const card=document.createElement('article'); card.className='bookmark' + (item.favorite?' favorite':'');
+      const top=document.createElement('div'); top.className='card-top';
+      const a=document.createElement('a'); a.className='title-link'; a.href=item.url; a.target='_blank'; a.rel='noopener noreferrer'; a.textContent=item.name;
+      const star=document.createElement('button'); star.type='button'; star.className='star'+(item.favorite?' on':''); star.textContent=item.favorite?'★':'☆'; star.setAttribute('aria-label',item.favorite?'Remove favorite':'Add favorite'); star.title=star.getAttribute('aria-label');
+      star.addEventListener('click',()=>{ item.favorite=!item.favorite; save(); render(); });
+      top.append(a,star);
+      const url=document.createElement('a'); url.className='url'; url.href=item.url; url.target='_blank'; url.rel='noopener noreferrer'; url.textContent=item.url;
+      const bottom=document.createElement('div'); bottom.className='card-bottom'; const cat=document.createElement('span'); cat.className='category'; cat.textContent=item.category;
+      const buttons=document.createElement('div'); buttons.className='card-buttons';
+      const edit=document.createElement('button'); edit.type='button'; edit.textContent='Edit'; edit.addEventListener('click',()=>beginEdit(item));
+      const del=document.createElement('button'); del.type='button'; del.className='delete'; del.textContent='Delete'; del.addEventListener('click',()=>{if(confirm('Delete “'+item.name+'”?')){bookmarks=bookmarks.filter(b=>b.id!==item.id);save();render();}});
+      buttons.append(edit,del); bottom.append(cat,buttons); card.append(top,url,bottom); area.append(card);
+    });
+  }
+  function beginEdit(item) {
+    editingId=item.id; $('name').value=item.name; $('url').value=item.url; $('category').value=item.category;
+    $('form-title').textContent='Edit bookmark'; $('save-button').textContent='Save changes'; showMessage(''); $('name').focus();
+  }
+  function resetForm() { editingId=null; $('bookmark-form').reset(); $('category').value='General'; $('form-title').textContent='Add a bookmark'; $('save-button').textContent='Add bookmark'; }
+  $('bookmark-form').addEventListener('submit', event => {
+    event.preventDefault(); const name=$('name').value.trim(), rawUrl=$('url').value.trim(), category=$('category').value.trim() || 'General';
+    if (!name || !rawUrl) { showMessage('Enter both a name and a URL.'); return; }
+    const url=safeUrl(rawUrl); if (!url) { showMessage('Enter a valid web address.'); return; }
+    if (editingId) { const item=bookmarks.find(b=>b.id===editingId); if(item) Object.assign(item,{name,url,category}); }
+    else bookmarks.push({id:makeId(),name,url,category,favorite:false});
+    save(); showMessage('Saved.'); resetForm(); render();
+  });
+  $('export-button').addEventListener('click',()=>{
+    const blob=new Blob([JSON.stringify(bookmarks,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='bookmarks.json'; document.body.append(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+  });
+  $('import-button').addEventListener('click',()=>$('import-file').click());
+  $('import-file').addEventListener('change',async event=>{
+    const file=event.target.files[0]; if(!file)return;
+    try {
+      const parsed=JSON.parse(await file.text()); const incoming=Array.isArray(parsed)?parsed:(parsed && Array.isArray(parsed.bookmarks)?parsed.bookmarks:null);
+      if(!incoming) throw new Error('shape');
+      let added=0;
+      incoming.filter(validBookmark).forEach(raw=>{ const item=cleanBookmark(raw); const duplicate=bookmarks.some(b=>b.url===item.url && b.name.toLowerCase()===item.name.toLowerCase() && b.category.toLowerCase()===item.category.toLowerCase()); if(!duplicate){ if(bookmarks.some(b=>b.id===item.id)) item.id=makeId(); bookmarks.push(item); added++; } });
+      save(); render(); showMessage(added ? `Imported ${added} bookmark${added===1?'':'s'}.` : 'No new bookmarks to import.');
+    } catch (_) { showMessage('That file is not a valid bookmark JSON export.'); }
+    event.target.value='';
+  });
+  render();
+})();
+</script>
+</body>
+</html>
