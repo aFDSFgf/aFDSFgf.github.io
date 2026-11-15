@@ -130,7 +130,9 @@
       const saved = localStorage.getItem(KEY);
       if (saved === null) { localStorage.setItem(KEY, JSON.stringify(starters)); return starters.map(x => ({...x})); }
       const parsed = JSON.parse(saved);
-      return Array.isArray(parsed) ? parsed.filter(validBookmark).map(cleanBookmark) : [];
+      if (!Array.isArray(parsed)) return [];
+      const seen = new Set();
+      return parsed.filter(validBookmark).map(raw => { const item=cleanBookmark(raw); if(seen.has(item.id)) item.id=makeId(); seen.add(item.id); return item; });
     } catch (_) { return []; }
   }
   function validBookmark(b) { return b && typeof b.name === 'string' && typeof b.url === 'string' && typeof b.category === 'string'; }
@@ -150,7 +152,7 @@
     const tabs = ['All', ...cats];
     $('tabs').replaceChildren(...tabs.map(c => { const b=document.createElement('button'); b.type='button'; b.className='tab' + (activeCategory===c?' active':''); b.textContent=c; b.setAttribute('aria-pressed', String(activeCategory===c)); b.addEventListener('click',()=>{activeCategory=c;render();}); return b; }));
     const list = bookmarks.filter(b => activeCategory==='All' || b.category===activeCategory).slice().sort((a,b) => Number(b.favorite)-Number(a.favorite) || a.name.localeCompare(b.name));
-    const area=$('bookmarks'); area.className=viewMode==='list'?'list-view':'grid';
+    const area=$('bookmarks'); area.replaceChildren(); area.className=viewMode==='list'?'list-view':'grid';
     $('grid-view').classList.toggle('active',viewMode==='grid'); $('list-view').classList.toggle('active',viewMode==='list');
     if (!list.length) { const p=document.createElement('p'); p.className='empty'; p.textContent='No bookmarks here yet. Add one above.'; area.append(p); return; }
     list.forEach(item => {
@@ -159,12 +161,12 @@
       const icon=document.createElement('span'); icon.className='bookmark-icon'; icon.textContent=item.icon||'↗'; icon.setAttribute('aria-hidden','true');
       const a=document.createElement('a'); a.className='title-link'; a.href=item.url; a.target='_blank'; a.rel='noopener noreferrer'; a.textContent=item.name;
       const star=document.createElement('button'); star.type='button'; star.className='star'+(item.favorite?' on':''); star.textContent=item.favorite?'★':'☆'; star.setAttribute('aria-label',item.favorite?'Remove favorite':'Add favorite'); star.title=star.getAttribute('aria-label');
-      star.addEventListener('click',()=>{ item.favorite=!item.favorite; save(); render(); });
+      star.addEventListener('click',()=>{ const target=bookmarks.find(b=>b.id===item.id); if(!target)return; target.favorite=!target.favorite; save(); render(); });
       const titleWrap=document.createElement('div'); titleWrap.className='card-title-wrap'; titleWrap.append(icon,a); top.append(titleWrap,star);
       const url=document.createElement('a'); url.className='url'; url.href=item.url; url.target='_blank'; url.rel='noopener noreferrer'; url.textContent=item.url;
       const bottom=document.createElement('div'); bottom.className='card-bottom'; const cat=document.createElement('span'); cat.className='category'; cat.textContent=item.category;
       const buttons=document.createElement('div'); buttons.className='card-buttons';
-      const edit=document.createElement('button'); edit.type='button'; edit.textContent='Edit'; edit.addEventListener('click',()=>beginEdit(item));
+      const edit=document.createElement('button'); edit.type='button'; edit.textContent='Edit'; edit.addEventListener('click',()=>{ const target=bookmarks.find(b=>b.id===item.id); if(target) beginEdit(target); });
       const del=document.createElement('button'); del.type='button'; del.className='delete'; del.textContent='Delete'; del.addEventListener('click',()=>{if(confirm('Delete “'+item.name+'”?')){bookmarks=bookmarks.filter(b=>b.id!==item.id);save();render();}});
       buttons.append(edit,del); bottom.append(cat,buttons); if(viewMode==='list'){ const main=document.createElement('div'); main.className='list-main'; const copy=document.createElement('div'); copy.className='list-copy'; copy.append(a,url); main.append(icon,copy); card.append(main,star,bottom); } else card.append(top,url,bottom); area.append(card);
     });
