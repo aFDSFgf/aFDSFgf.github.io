@@ -3,18 +3,21 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Gage's Organizer</title>
+  <title>Bookmark Organizer</title>
   <style>
     :root { --bg:#0b1019; --card:rgba(19,25,36,.86); --line:rgba(92,111,139,.32); }
     body { background:var(--bg); isolation:isolate; }
     #ambient { position:fixed; inset:0; z-index:-1; pointer-events:none; overflow:hidden; background:radial-gradient(ellipse at 15% 15%,rgba(12,83,126,.26),transparent 45%),radial-gradient(ellipse at 86% 78%,rgba(48,35,111,.22),transparent 48%),#0b1019; }
-    #ambient::before { content:""; position:absolute; inset:-28%; background:radial-gradient(ellipse at 35% 38%,rgba(0,183,220,.15),transparent 27%),radial-gradient(ellipse at 69% 62%,rgba(95,76,220,.14),transparent 31%); animation:aurora 24s ease-in-out infinite alternate; }
-    #pointer-glow { position:absolute; width:min(560px,95vw); aspect-ratio:1; border-radius:50%; transform:translate(-50%,-50%); background:radial-gradient(circle,rgba(49,157,245,.2) 0,rgba(59,129,223,.09) 32%,transparent 70%); filter:blur(15px); will-change:left,top; }
+    #ambient::before { content:""; position:absolute; inset:-24%; background:radial-gradient(ellipse at 25% 35%,rgba(0,220,244,.21),transparent 27%),radial-gradient(ellipse at 70% 65%,rgba(123,73,255,.20),transparent 30%),radial-gradient(ellipse at 54% 20%,rgba(0,201,157,.13),transparent 32%); animation:aurora 30s ease-in-out infinite alternate; transform:translate(var(--px,0),var(--py,0)); }
+    #ambient::after { content:""; position:absolute; inset:0; opacity:.22; background-image:radial-gradient(1px 1px at 12% 18%,#d8faff 60%,transparent),radial-gradient(1px 1px at 77% 28%,#bfcaff 60%,transparent),radial-gradient(1px 1px at 42% 73%,#b4fff1 60%,transparent),radial-gradient(1px 1px at 91% 84%,#fff 50%,transparent),repeating-linear-gradient(0deg,transparent 0 3px,rgba(180,220,255,.018) 4px); background-size:100% 100%; animation:twinkle 9s ease-in-out infinite alternate; }
+    #pointer-glow { position:absolute; z-index:1; width:min(620px,110vw); aspect-ratio:1; border-radius:50%; transform:translate(-50%,-50%); background:radial-gradient(circle,rgba(54,220,255,.27) 0,rgba(59,129,223,.12) 28%,transparent 69%); filter:blur(10px); will-change:left,top; }
+    #ambient { background-image:radial-gradient(ellipse at center,transparent 35%,rgba(2,5,13,.65) 100%),radial-gradient(ellipse at 15% 15%,rgba(12,83,126,.26),transparent 45%),radial-gradient(ellipse at 86% 78%,rgba(48,35,111,.22),transparent 48%),linear-gradient(#0b1019,#0b1019); }
+    @keyframes twinkle { from { opacity:.12; } to { opacity:.29; } }
     @keyframes aurora { from { transform:translate(-3%,2%) rotate(-8deg) scale(.98); } to { transform:translate(3%,-2%) rotate(8deg) scale(1.06); } }
     .panel,.bookmark,.empty { background:rgba(19,25,36,.82); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); }
     .bookmark { transition:transform .22s ease,border-color .22s ease,box-shadow .22s ease; transform-style:preserve-3d; }
     @media (hover:hover) and (prefers-reduced-motion:no-preference) { .bookmark:hover { transform:translateY(-4px) perspective(700px) rotateX(1deg); border-color:rgba(57,189,248,.55); box-shadow:0 12px 34px rgba(0,0,0,.24),0 0 22px rgba(57,189,248,.11); } }
-    @media (prefers-reduced-motion:reduce) { #ambient::before { animation:none; } .bookmark { transition:none; } }
+    @media (prefers-reduced-motion:reduce) { #ambient::before,#ambient::after { animation-duration:90s; } .bookmark { transition:none; } }
     :root { color-scheme: dark; --bg:#0b1019; --card:rgba(19,25,36,.86); --line:rgba(92,111,139,.32); --text:#e7eaf0; --muted:#9ba4b3; --accent:#39bdf8; --danger:#ff6b75; }
     * { box-sizing:border-box; }
     body { margin:0; min-height:100vh; background:var(--bg); color:var(--text); font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif; }
@@ -36,6 +39,23 @@
     .tab { white-space:nowrap; border-radius:999px; min-height:40px; padding:7px 14px; background:transparent; }
     .tab.active { background:#123044; border-color:#1b91c5; color:#8ddfff; }
     .actions { display:flex; gap:8px; }
+    .view-toggle { display:flex; gap:4px; margin-left:auto; }
+    .view-toggle button { min-width:38px; min-height:38px; padding:5px; font-size:1.05rem; }
+    .view-toggle button.active { color:#8ddfff; border-color:#1b91c5; background:#123044; }
+    .icon-select { min-height:44px; width:100%; border:1px solid var(--line); background:#101319; color:var(--text); border-radius:9px; padding:8px 10px; font:inherit; }
+    .bookmark-icon { display:grid; place-items:center; flex:0 0 38px; width:38px; height:38px; border-radius:11px; background:#222733; font-size:1.2rem; }
+    .card-title-wrap { display:flex; align-items:center; gap:10px; min-width:0; flex:1; }
+    .list-view { display:flex; flex-direction:column; gap:5px; }
+    .list-view .bookmark { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:8px 14px; padding:7px 10px; border-radius:9px; }
+    .list-view .bookmark:hover { transform:none; background:rgba(42,54,72,.8); box-shadow:none; }
+    .list-main { display:flex; min-width:0; align-items:center; gap:10px; }
+    .list-copy { min-width:0; flex:1; }
+    .list-view .title-link { display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:.94rem; }
+    .list-view .url { display:block; margin:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:.75rem; }
+    .list-view .card-bottom { display:contents; }
+    .list-view .category { display:none; }
+    .list-view .card-buttons { grid-column:2; grid-row:1; }
+    .list-view .card-buttons button,.list-view .star { min-height:34px; padding:4px 8px; }
     .actions button { min-height:40px; }
     .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
     .bookmark { min-width:0; background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px; }
@@ -63,7 +83,7 @@
   <div id="ambient" aria-hidden="true"><div id="pointer-glow"></div></div>
   <main class="wrap">
     <header>
-      <h1>Gage's Organizer</h1>
+      <h1>Bookmark Organizer</h1>
       <p class="subtitle">Your links, saved on this device</p>
     </header>
     <section class="panel" aria-labelledby="form-title">
@@ -72,6 +92,7 @@
         <div class="form-grid">
           <div><label for="name">Name</label><input id="name" maxlength="100" autocomplete="off" placeholder="e.g. Study guide"></div>
           <div class="wide"><label for="url">URL</label><input id="url" type="text" inputmode="url" maxlength="2000" autocomplete="url" placeholder="example.com"></div>
+          <div><label for="icon">Icon</label><select id="icon" class="icon-select"><option value="">Default link</option><option>🔗</option><option>📚</option><option>🎮</option><option>🎵</option><option>🎬</option><option>🛠️</option><option>📝</option><option>⭐</option><option>🌐</option><option>📷</option><option>💬</option><option>🧩</option></select></div>
           <div><label for="category">Category</label><input id="category" list="category-list" maxlength="40" autocomplete="off" value="General" placeholder="Choose or type"><datalist id="category-list"></datalist></div>
           <button id="save-button" class="primary" type="submit">Add bookmark</button>
         </div>
@@ -80,10 +101,11 @@
     </section>
     <div class="toolbar">
       <nav id="tabs" class="tabs" aria-label="Filter bookmarks"></nav>
+      <div class="view-toggle" aria-label="Bookmark view"><button id="grid-view" type="button" aria-label="Grid view" title="Grid view">▦</button><button id="list-view" type="button" aria-label="List view" title="List view">☰</button></div>
       <div class="actions">
         <button id="export-button" type="button">Export</button>
         <button id="import-button" type="button">Import</button>
-        <input id="import-file" class="visually-hidden" type="file" accept=".json,.html,application/json,text/html">
+        <input id="import-file" class="visually-hidden" type="file" accept=".json,.html,application/json,text/html,*/*">
       </div>
     </div>
     <section id="bookmarks" class="grid" aria-label="Bookmarks"></section>
@@ -91,8 +113,8 @@
 <script>
 (() => {
   'use strict';
-  const KEY = 'gage-organizer-bookmarks-v1';
-  const DEFAULT_CATEGORIES = ['School', 'General', 'Entertainment', 'Tools'];
+  const KEY = 'bookmark-organizer-bookmarks-v1';
+  const DEFAULT_CATEGORIES = ['Learning', 'General', 'Entertainment', 'Tools'];
   const starters = [
     { id:'starter-google', name:'Google', url:'https://www.google.com', category:'General', favorite:false },
     { id:'starter-youtube', name:'YouTube', url:'https://www.youtube.com', category:'Entertainment', favorite:false },
@@ -102,6 +124,7 @@
   let bookmarks = load();
   let activeCategory = 'All';
   let editingId = null;
+  let viewMode = localStorage.getItem('bookmark-view') === 'list' ? 'list' : 'grid';
   function load() {
     try {
       const saved = localStorage.getItem(KEY);
@@ -111,7 +134,7 @@
     } catch (_) { return []; }
   }
   function validBookmark(b) { return b && typeof b.name === 'string' && typeof b.url === 'string' && typeof b.category === 'string'; }
-  function cleanBookmark(b) { return { id: typeof b.id === 'string' ? b.id : makeId(), name:b.name.slice(0,100), url:b.url.slice(0,2000), category:(b.category.trim() || 'General').slice(0,40), favorite:!!b.favorite }; }
+  function cleanBookmark(b) { return { id: typeof b.id === 'string' ? b.id : makeId(), name:b.name.slice(0,100), url:b.url.slice(0,2000), category:(b.category.trim() || 'General').slice(0,40), favorite:!!b.favorite, icon:typeof b.icon==='string'?b.icon:'' }; }
   function save() { try { localStorage.setItem(KEY, JSON.stringify(bookmarks)); } catch (_) { showMessage('Could not save. Browser storage may be unavailable.'); } }
   function makeId() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
   function safeUrl(raw) {
@@ -127,36 +150,40 @@
     const tabs = ['All', ...cats];
     $('tabs').replaceChildren(...tabs.map(c => { const b=document.createElement('button'); b.type='button'; b.className='tab' + (activeCategory===c?' active':''); b.textContent=c; b.setAttribute('aria-pressed', String(activeCategory===c)); b.addEventListener('click',()=>{activeCategory=c;render();}); return b; }));
     const list = bookmarks.filter(b => activeCategory==='All' || b.category===activeCategory).slice().sort((a,b) => Number(b.favorite)-Number(a.favorite) || a.name.localeCompare(b.name));
-    const area=$('bookmarks'); area.replaceChildren();
+    const area=$('bookmarks'); area.className=viewMode==='list'?'list-view':'grid';
+    $('grid-view').classList.toggle('active',viewMode==='grid'); $('list-view').classList.toggle('active',viewMode==='list');
     if (!list.length) { const p=document.createElement('p'); p.className='empty'; p.textContent='No bookmarks here yet. Add one above.'; area.append(p); return; }
     list.forEach(item => {
       const card=document.createElement('article'); card.className='bookmark' + (item.favorite?' favorite':'');
       const top=document.createElement('div'); top.className='card-top';
+      const icon=document.createElement('span'); icon.className='bookmark-icon'; icon.textContent=item.icon||'↗'; icon.setAttribute('aria-hidden','true');
       const a=document.createElement('a'); a.className='title-link'; a.href=item.url; a.target='_blank'; a.rel='noopener noreferrer'; a.textContent=item.name;
       const star=document.createElement('button'); star.type='button'; star.className='star'+(item.favorite?' on':''); star.textContent=item.favorite?'★':'☆'; star.setAttribute('aria-label',item.favorite?'Remove favorite':'Add favorite'); star.title=star.getAttribute('aria-label');
       star.addEventListener('click',()=>{ item.favorite=!item.favorite; save(); render(); });
-      top.append(a,star);
+      const titleWrap=document.createElement('div'); titleWrap.className='card-title-wrap'; titleWrap.append(icon,a); top.append(titleWrap,star);
       const url=document.createElement('a'); url.className='url'; url.href=item.url; url.target='_blank'; url.rel='noopener noreferrer'; url.textContent=item.url;
       const bottom=document.createElement('div'); bottom.className='card-bottom'; const cat=document.createElement('span'); cat.className='category'; cat.textContent=item.category;
       const buttons=document.createElement('div'); buttons.className='card-buttons';
       const edit=document.createElement('button'); edit.type='button'; edit.textContent='Edit'; edit.addEventListener('click',()=>beginEdit(item));
       const del=document.createElement('button'); del.type='button'; del.className='delete'; del.textContent='Delete'; del.addEventListener('click',()=>{if(confirm('Delete “'+item.name+'”?')){bookmarks=bookmarks.filter(b=>b.id!==item.id);save();render();}});
-      buttons.append(edit,del); bottom.append(cat,buttons); card.append(top,url,bottom); area.append(card);
+      buttons.append(edit,del); bottom.append(cat,buttons); if(viewMode==='list'){ const main=document.createElement('div'); main.className='list-main'; const copy=document.createElement('div'); copy.className='list-copy'; copy.append(a,url); main.append(icon,copy); card.append(main,star,bottom); } else card.append(top,url,bottom); area.append(card);
     });
   }
   function beginEdit(item) {
-    editingId=item.id; $('name').value=item.name; $('url').value=item.url; $('category').value=item.category;
+    editingId=item.id; $('name').value=item.name; $('url').value=item.url; $('category').value=item.category; $('icon').value=item.icon||'';
     $('form-title').textContent='Edit bookmark'; $('save-button').textContent='Save changes'; showMessage(''); $('name').focus();
   }
-  function resetForm() { editingId=null; $('bookmark-form').reset(); $('category').value='General'; $('form-title').textContent='Add a bookmark'; $('save-button').textContent='Add bookmark'; }
+  function resetForm() { editingId=null; $('bookmark-form').reset(); $('category').value='General'; $('icon').value=''; $('form-title').textContent='Add a bookmark'; $('save-button').textContent='Add bookmark'; }
   $('bookmark-form').addEventListener('submit', event => {
     event.preventDefault(); const name=$('name').value.trim(), rawUrl=$('url').value.trim(), category=$('category').value.trim() || 'General';
     if (!name || !rawUrl) { showMessage('Enter both a name and a URL.'); return; }
     const url=safeUrl(rawUrl); if (!url) { showMessage('Enter a valid web address.'); return; }
-    if (editingId) { const item=bookmarks.find(b=>b.id===editingId); if(item) Object.assign(item,{name,url,category}); }
-    else bookmarks.push({id:makeId(),name,url,category,favorite:false});
+    if (editingId) { const item=bookmarks.find(b=>b.id===editingId); if(item) Object.assign(item,{name,url,category,icon:$('icon').value}); }
+    else bookmarks.push({id:makeId(),name,url,category,favorite:false,icon:$('icon').value});
     save(); showMessage('Saved.'); resetForm(); render();
   });
+  $('grid-view').addEventListener('click',()=>{viewMode='grid';localStorage.setItem('bookmark-view',viewMode);render();});
+  $('list-view').addEventListener('click',()=>{viewMode='list';localStorage.setItem('bookmark-view',viewMode);render();});
   $('export-button').addEventListener('click',()=>{
     const blob=new Blob([JSON.stringify(bookmarks,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='bookmarks.json'; document.body.append(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),1000);
   });
@@ -173,13 +200,42 @@
   $('import-file').addEventListener('change',async event=>{
     const file=event.target.files[0]; if(!file)return;
     try {
-      const text=await file.text(); let incoming;
-      if (/\.html?$/i.test(file.name) || file.type==='text/html') { incoming=extractBookmarks(text); if(!incoming){showMessage('No bookmarks were found in that file.');event.target.value='';return;} }
-      else { const parsed=JSON.parse(text); incoming=Array.isArray(parsed)?parsed:(parsed && Array.isArray(parsed.bookmarks)?parsed.bookmarks:null); if(!incoming) throw new Error('shape'); }
+      const text=await file.text(); let incoming, chromeFormat=false;
+      // Content-first parsing: JSON exports, JSON arrays embedded in HTML/scripts, then Netscape bookmark HTML.
+      incoming=extractBookmarks(text);
+      if(!incoming) {
+        try {
+          const doc=new DOMParser().parseFromString(text,'text/html');
+          const anchors=[...doc.querySelectorAll('a[href]')];
+          if (anchors.length) {
+            incoming=anchors.map(a=>({name:(a.textContent||'').trim()||a.getAttribute('href'),url:a.getAttribute('href')}))
+              .filter(b=>b.url && !/^\s*javascript:/i.test(b.url));
+            chromeFormat=true;
+          }
+        } catch (_) {
+          const re=/<A\b[^>]*\bHREF\s*=\s*(['"])(.*?)\1[^>]*>([\s\S]*?)<\/A\s*>/gi;
+          const found=[]; let m;
+          while((m=re.exec(text))) { const url=m[2].trim(); const name=m[3].replace(/<[^>]*>/g,'').trim(); if(url && !/^javascript:/i.test(url)) found.push({name:name||url,url}); }
+          if(found.length){incoming=found;chromeFormat=true;}
+        }
+      } else if (!incoming.some(validBookmark)) chromeFormat=true;
+      if(!incoming){showMessage('No bookmarks found in that file.');event.target.value='';return;}
       let added=0;
-      incoming.filter(validBookmark).forEach(raw=>{ const item=cleanBookmark(raw); const duplicate=bookmarks.some(b=>b.url===item.url && b.name.toLowerCase()===item.name.toLowerCase() && b.category.toLowerCase()===item.category.toLowerCase()); if(!duplicate){ if(bookmarks.some(b=>b.id===item.id)) item.id=makeId(); bookmarks.push(item); added++; } });
-      save(); render(); showMessage(added ? `Imported ${added} bookmark${added===1?'':'s'}.` : 'No new bookmarks to import.');
-    } catch (_) { showMessage('That file is not a valid bookmark JSON export.'); }
+      if(chromeFormat) {
+        // Ensure General remains available even if category defaults were customized.
+        const general=categories().find(c=>c.toLowerCase()==='general') || 'General';
+        incoming.forEach(raw=>{
+          if(!raw || typeof raw.url!=='string') return;
+          const href=raw.url.trim(); if(!href || /^javascript:/i.test(href)) return;
+          const item={id:makeId(),name:(typeof raw.name==='string' && raw.name.trim()?raw.name.trim():href).slice(0,100),url:href.slice(0,2000),category:general,favorite:false};
+          if(!bookmarks.some(b=>b.url===item.url)){bookmarks.push(item);added++;}
+        });
+      } else {
+        incoming.filter(validBookmark).forEach(raw=>{ const item=cleanBookmark(raw); const duplicate=bookmarks.some(b=>b.url===item.url && b.name.toLowerCase()===item.name.toLowerCase() && b.category.toLowerCase()===item.category.toLowerCase()); if(!duplicate){ if(bookmarks.some(b=>b.id===item.id)) item.id=makeId(); bookmarks.push(item); added++; } });
+      }
+      if(added){save();render();}
+      showMessage(added ? `Imported ${added} bookmark${added===1?'':'s'}.` : 'No bookmarks found in that file.');
+    } catch (_) { showMessage('That file is not a valid bookmark export.'); }
     event.target.value='';
   });
   const glow=document.getElementById('pointer-glow');
@@ -187,10 +243,11 @@
   const point=(px,py)=>{tx=px;ty=py;hasPointer=true;lastMove=performance.now();};
   addEventListener('pointermove',e=>point(e.clientX,e.clientY),{passive:true});
   addEventListener('touchmove',e=>{if(e.touches[0])point(e.touches[0].clientX,e.touches[0].clientY);},{passive:true});
+  let gx=tx,gy=ty;
   function animate(now){
     if(!hasPointer || now-lastMove>9000){tx=innerWidth*(.5+.25*Math.sin(now/6500));ty=innerHeight*(.5+.2*Math.cos(now/7300));}
     const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches; const ease=reduced?.045:.075;
-    x+=(tx-x)*ease;y+=(ty-y)*ease;glow.style.left=x+'px';glow.style.top=y+'px';requestAnimationFrame(animate);
+    x+=(tx-x)*ease;y+=(ty-y)*ease; gx+=(x-gx)*.045;gy+=(y-gy)*.045; glow.style.left=x+'px';glow.style.top=y+'px'; glow.style.background=`radial-gradient(ellipse at ${50+(x-gx)/innerWidth*100}% ${50+(y-gy)/innerHeight*100}%,rgba(82,226,255,.30) 0,rgba(74,136,255,.12) 30%,transparent 70%)`; document.getElementById('ambient').style.setProperty('--px',((innerWidth/2-x)*.012)+'px');document.getElementById('ambient').style.setProperty('--py',((innerHeight/2-y)*.012)+'px');requestAnimationFrame(animate);
   }
   requestAnimationFrame(animate);
   render();
