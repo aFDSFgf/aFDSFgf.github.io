@@ -5,7 +5,17 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Gage's Organizer</title>
   <style>
-    :root { color-scheme: dark; --bg:#0f1115; --card:#171a21; --line:#292e39; --text:#e7eaf0; --muted:#9ba4b3; --accent:#39bdf8; --danger:#ff6b75; }
+    :root { --bg:#0b1019; --card:rgba(19,25,36,.86); --line:rgba(92,111,139,.32); }
+    body { background:var(--bg); isolation:isolate; }
+    #ambient { position:fixed; inset:0; z-index:-1; pointer-events:none; overflow:hidden; background:radial-gradient(ellipse at 15% 15%,rgba(12,83,126,.26),transparent 45%),radial-gradient(ellipse at 86% 78%,rgba(48,35,111,.22),transparent 48%),#0b1019; }
+    #ambient::before { content:""; position:absolute; inset:-28%; background:radial-gradient(ellipse at 35% 38%,rgba(0,183,220,.15),transparent 27%),radial-gradient(ellipse at 69% 62%,rgba(95,76,220,.14),transparent 31%); animation:aurora 24s ease-in-out infinite alternate; }
+    #pointer-glow { position:absolute; width:min(560px,95vw); aspect-ratio:1; border-radius:50%; transform:translate(-50%,-50%); background:radial-gradient(circle,rgba(49,157,245,.2) 0,rgba(59,129,223,.09) 32%,transparent 70%); filter:blur(15px); will-change:left,top; }
+    @keyframes aurora { from { transform:translate(-3%,2%) rotate(-8deg) scale(.98); } to { transform:translate(3%,-2%) rotate(8deg) scale(1.06); } }
+    .panel,.bookmark,.empty { background:rgba(19,25,36,.82); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); }
+    .bookmark { transition:transform .22s ease,border-color .22s ease,box-shadow .22s ease; transform-style:preserve-3d; }
+    @media (hover:hover) and (prefers-reduced-motion:no-preference) { .bookmark:hover { transform:translateY(-4px) perspective(700px) rotateX(1deg); border-color:rgba(57,189,248,.55); box-shadow:0 12px 34px rgba(0,0,0,.24),0 0 22px rgba(57,189,248,.11); } }
+    @media (prefers-reduced-motion:reduce) { #ambient::before { animation:none; } .bookmark { transition:none; } }
+    :root { color-scheme: dark; --bg:#0b1019; --card:rgba(19,25,36,.86); --line:rgba(92,111,139,.32); --text:#e7eaf0; --muted:#9ba4b3; --accent:#39bdf8; --danger:#ff6b75; }
     * { box-sizing:border-box; }
     body { margin:0; min-height:100vh; background:var(--bg); color:var(--text); font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif; }
     .wrap { width:min(100% - 32px, 1000px); margin:0 auto; padding:42px 0 56px; }
@@ -50,6 +60,7 @@
   </style>
 </head>
 <body>
+  <div id="ambient" aria-hidden="true"><div id="pointer-glow"></div></div>
   <main class="wrap">
     <header>
       <h1>Gage's Organizer</h1>
@@ -72,7 +83,7 @@
       <div class="actions">
         <button id="export-button" type="button">Export</button>
         <button id="import-button" type="button">Import</button>
-        <input id="import-file" class="visually-hidden" type="file" accept="application/json,.json">
+        <input id="import-file" class="visually-hidden" type="file" accept=".json,.html,application/json,text/html">
       </div>
     </div>
     <section id="bookmarks" class="grid" aria-label="Bookmarks"></section>
@@ -150,17 +161,38 @@
     const blob=new Blob([JSON.stringify(bookmarks,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='bookmarks.json'; document.body.append(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),1000);
   });
   $('import-button').addEventListener('click',()=>$('import-file').click());
+  function extractBookmarks(text) {
+    const usable = value => Array.isArray(value) && value.some(validBookmark) ? value : null;
+    try { const parsed=JSON.parse(text); const found=usable(parsed) || (parsed && usable(parsed.bookmarks)); if(found)return found; } catch (_) {}
+    const patterns=[/localStorage\.setItem\s*\(\s*['"`][^'"`]+['"`]\s*,\s*(['"`])([\s\S]*?)\1\s*\)/g];
+    for (const re of patterns) { let m; while ((m=re.exec(text))) { try { const value=JSON.parse(m[2]); const found=usable(value) || (value && usable(value.bookmarks)); if(found)return found; } catch (_) { try { const decoded=JSON.parse('"'+m[2].replace(/\\'/g,"'").replace(/\\\\/g,"\\").replace(/\\n/g,"\n")+'"'); const value=JSON.parse(decoded); const found=usable(value) || (value && usable(value.bookmarks)); if(found)return found; } catch (_) {} } } }
+    const arr=/\[[\s\S]*?\]/g; let m;
+    while((m=arr.exec(text))) { try { const found=usable(JSON.parse(m[0])); if(found)return found; } catch (_) {} }
+    return null;
+  }
   $('import-file').addEventListener('change',async event=>{
     const file=event.target.files[0]; if(!file)return;
     try {
-      const parsed=JSON.parse(await file.text()); const incoming=Array.isArray(parsed)?parsed:(parsed && Array.isArray(parsed.bookmarks)?parsed.bookmarks:null);
-      if(!incoming) throw new Error('shape');
+      const text=await file.text(); let incoming;
+      if (/\.html?$/i.test(file.name) || file.type==='text/html') { incoming=extractBookmarks(text); if(!incoming){showMessage('No bookmarks were found in that file.');event.target.value='';return;} }
+      else { const parsed=JSON.parse(text); incoming=Array.isArray(parsed)?parsed:(parsed && Array.isArray(parsed.bookmarks)?parsed.bookmarks:null); if(!incoming) throw new Error('shape'); }
       let added=0;
       incoming.filter(validBookmark).forEach(raw=>{ const item=cleanBookmark(raw); const duplicate=bookmarks.some(b=>b.url===item.url && b.name.toLowerCase()===item.name.toLowerCase() && b.category.toLowerCase()===item.category.toLowerCase()); if(!duplicate){ if(bookmarks.some(b=>b.id===item.id)) item.id=makeId(); bookmarks.push(item); added++; } });
       save(); render(); showMessage(added ? `Imported ${added} bookmark${added===1?'':'s'}.` : 'No new bookmarks to import.');
     } catch (_) { showMessage('That file is not a valid bookmark JSON export.'); }
     event.target.value='';
   });
+  const glow=document.getElementById('pointer-glow');
+  let tx=innerWidth*.5,ty=innerHeight*.45,x=tx,y=ty,hasPointer=false,lastMove=0;
+  const point=(px,py)=>{tx=px;ty=py;hasPointer=true;lastMove=performance.now();};
+  addEventListener('pointermove',e=>point(e.clientX,e.clientY),{passive:true});
+  addEventListener('touchmove',e=>{if(e.touches[0])point(e.touches[0].clientX,e.touches[0].clientY);},{passive:true});
+  function animate(now){
+    if(!hasPointer || now-lastMove>9000){tx=innerWidth*(.5+.25*Math.sin(now/6500));ty=innerHeight*(.5+.2*Math.cos(now/7300));}
+    const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches; const ease=reduced?.045:.075;
+    x+=(tx-x)*ease;y+=(ty-y)*ease;glow.style.left=x+'px';glow.style.top=y+'px';requestAnimationFrame(animate);
+  }
+  requestAnimationFrame(animate);
   render();
 })();
 </script>
